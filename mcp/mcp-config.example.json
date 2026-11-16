@@ -1,0 +1,31 @@
+{
+  "mcpServers": {
+    "atlassian": {
+      "type": "http",
+      "url": "https://mcp.atlassian.com/v2/mcp",
+      "tools": ["*"]
+    },
+    "slack": {
+      "type": "http",
+      "url": "https://mcp.slack.com/mcp",
+      "tools": ["*"]
+    },
+    "example-remote": {
+      "type": "http",
+      "url": "https://mcp.example.invalid/mcp",
+      "headers": {
+        "Authorization": "__SET_IN_LOCAL_CONFIG__"
+      },
+      "tools": ["__LIST_REVIEWED_READ_ONLY_TOOLS__"]
+    },
+    "example-local": {
+      "type": "local",
+      "command": "__REVIEWED_LOCAL_COMMAND__",
+      "args": ["__REVIEWED_PACKAGE_AT_PINNED_VERSION__"],
+      "env": {
+        "EXAMPLE_API_TOKEN": "__SET_IN_LOCAL_CONFIG__"
+      },
+      "tools": ["__LIST_REVIEWED_READ_ONLY_TOOLS__"]
+    }
+  }
+}

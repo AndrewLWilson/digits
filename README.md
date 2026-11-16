@@ -1,0 +1,332 @@
+# Digits
+
+Digits lets you keep a large number of GitHub Copilot CLI agent conversations
+going in parallel without ever losing sight of one of them.
+
+It comes in four parts that you can adopt separately:
+
+- **Dashboard**: a single tmux session with ten independent environments, each
+  named after a finger (`left_pinky` through `right_pinky`). A live activity
+  view shows what every chat is doing and for how long, a click switches to
+  that environment, and one shortcut jumps straight to whichever chat is
+  waiting for you.
+- **Plugin**: Copilot CLI workflow skills for handling PR reviews, rebasing,
+  investigating problems, drafting standups and coordinating work between
+  environments. Every skill asks for explicit approval before acting and
+  defaults to a dry run.
+- **Context library**: a short bootstrap file that is always loaded and holds a
+  route table, plus Markdown topic pages that agents open only when a task
+  calls for them (progressive disclosure). Its installer shows a preview first,
+  keeps immutable snapshots, and can roll back.
+- **Integration recipes**: MCP configuration examples that contain no
+  credentials, together with a template for writing up new integrations.
+
+Take whichever parts are useful to you and ignore the rest. Digits does not
+image workstations, provision repositories, or enforce any organization's
+policy.
+
+If you want to apply the same ideas to your own tools and team, read
+[Build your own Digits](docs/build-your-own.md).
+
+## Status
+
+Digits has not been released yet.
+
+**No license has been chosen. Until one is added, nobody is granted any rights
+to use, copy, modify or distribute this code.**
+
+The remaining release work is tracked in the
+[open-source release checklist](docs/open-source-release-checklist.md).
+
+## Requirements
+
+- macOS, the only platform Digits is tested on.
+- [tmux](https://github.com/tmux/tmux).
+- Python 3.9 or newer.
+- Node.js.
+- [GitHub Copilot CLI](https://docs.github.com/en/copilot/how-tos/copilot-cli).
+- fish, because the launcher opens a fish login shell in every environment.
+- Optional: [Ghostty](https://ghostty.org/) for the keyboard shortcuts, and
+  Visual Studio Code for the `md-view` Markdown viewer.
+
+You sign in to Copilot on your own; Digits never handles that. GitHub or MCP
+authentication only matters for the workflows that talk to those services.
+
+The dashboard extension relies on experimental Copilot SDK APIs, so turn on
+experimental mode with `/settings experimental on`. It has been tested with
+Copilot CLI versions 1.0.100 to 1.0.105; check that it behaves before relying
+on it with any other version.
+
+## Quick start
+
+Run every command from the repository root. Each installer only shows what it
+would do until you pass `--apply`.
+
+### Dashboard
+
+```bash
+python3 install.py            # dry run: print the plan, change nothing
+python3 install.py --apply    # perform the installation
+~/.local/bin/ai-agents        # start the session, or reattach to it
+```
+
+The installer copies five runtime files: the `ai-agents` launcher, the
+`md-view` viewer, the dashboard's tmux configuration, and the extension's
+`extension.mjs` and `state.mjs`. It also creates any of the ten environment
+directories that do not exist yet.
+
+It does not clone repositories, start chats, sign you in to anything, or edit
+your Copilot settings, Ghostty configuration, MCP configuration or global tmux
+configuration.
+
+### Plugin
+
+```bash
+copilot plugin marketplace add /path/to/digits
+copilot plugin install digits@digits
+```
+
+[plugin/README.md](plugin/README.md) explains how to update the plugin and how
+to set up each skill. Some skills only become useful once you have written
+local, non-secret bindings for them.
+
+### Context library
+
+```bash
+python3 context_install.py               # dry run: print the plan, change nothing
+python3 context_install.py --apply       # install or update the context
+python3 context_install.py --rollback    # dry run of returning to the previous snapshot
+```
+
+If you already have a Copilot instruction file, the installer only takes it
+over when you adopt it explicitly with the hash shown in the preview
+(`--adopt-sha256`). Receipts, backups and private bindings stay on your
+machine. See [context/README.md](context/README.md) for details.
+
+### Integrations
+
+[mcp/README.md](mcp/README.md) describes how to set up MCP servers while
+keeping every secret out of Git, and how to check each service with a harmless
+read before trusting it.
+
+## Dashboard
+
+The launcher creates the managed tmux session `ai-agents`, or reattaches to it
+when it is already running.
+
+| Window | Environment | Window | Environment |
+|---|---|---|---|
+| 1 | `left_pinky` | 6 | `right_thumb` |
+| 2 | `left_ring` | 7 | `right_pointer` |
+| 3 | `left_middle` | 8 | `right_middle` |
+| 4 | `left_pointer` | 9 | `right_ring` |
+| 5 | `left_thumb` | 10 | `right_pinky` |
+
+Each environment is a separate directory in your home folder. Put a distinct
+clone in each one (never worktrees that share a repository) and start Copilot
+by hand wherever you want a chat.
+
+Running the launcher again keeps every existing pane and the window you are
+on. If a window has an unexpected name it refuses to continue rather than
+replace it, and it never restarts a chat. Closing the terminal only detaches;
+the session keeps running. After a reboot the environments come back as fresh
+shells, but conversations are not restored.
+
+### States
+
+| State | Meaning |
+|---|---|
+| READY | A plain shell, or a chat that has not started any work yet |
+| WORKING | The chat is busy with a turn, or another program runs in the foreground |
+| SUBAGENTS | Child agents are running for the chat |
+| WATCHING | The chat is waiting only on a background shell it is attached to |
+| NEEDS YOU | The chat is waiting for your input or a permission decision |
+| ERROR | The session reported an error, or the pane has died |
+| COPILOT / UNKNOWN | COPILOT: Copilot is running but nothing has been published yet; UNKNOWN: state tracking failed |
+| YOUR TURN | The chat finished its turn and the next move is yours |
+| WAITING | An idle chat with a waiting reason you typed in |
+
+Pending input and errors always outrank any background wait. Services started
+in detached mode are not counted as watched shells.
+
+WORKING, SUBAGENTS and WATCHING show how long the current run has been going.
+YOUR TURN shows how long the turn took and the clock time it finished, for
+example `4m12s @09:46`. WAITING shows the time since the turn finished.
+
+To record why you are waiting, right-click a YOUR TURN entry and type a
+reason. Submitting an empty reason clears it, and so does the chat starting
+work again. It is a personal note, not a scheduling feature.
+
+The view redraws every second using tmux's own format strings. Chat states
+come from Copilot lifecycle events and SDK snapshots rather than polling. If
+tracking breaks, the entry shows UNKNOWN and the extension retries with a
+capped backoff.
+
+### Shortcuts
+
+Click an entry to switch to that environment. The **hotkeys** button in the
+top-right corner opens a menu listing every shortcut and runs the one you
+pick.
+
+Two optional fragments add keyboard shortcuts:
+[terminal/ghostty-keybindings.conf](terminal/ghostty-keybindings.conf) for
+Ghostty and
+[terminal/ai-agents-shortcuts.tmux.conf](terminal/ai-agents-shortcuts.tmux.conf)
+for tmux.
+
+| Shortcut | Action |
+|---|---|
+| Cmd+1 … Cmd+9, Cmd+0 | Go to window 1 … 10 |
+| Cmd+Shift+] / Cmd+Shift+[ | Next / previous window, wrapping around |
+| Cmd+; | Back to the previous window |
+| Cmd+` | Next chat that wants attention: NEEDS YOU before YOUR TURN, never WAITING |
+| Cmd+Shift+M | Open that chat's most recent session Markdown in `md-view` |
+
+`md-view` renders Markdown in a separate VS Code instance with its own profile
+at `~/Library/Application Support/digits-markdown-viewer`, so your normal
+editor windows are left alone.
+
+The installer touches neither Ghostty nor your global tmux file, so adopting
+the shortcuts is manual:
+
+1. Merge the Ghostty bindings into your Ghostty configuration.
+2. Copy the tmux fragment to `~/.tmux/ai-agents-shortcuts.conf`.
+3. Add `source-file ~/.tmux/ai-agents-shortcuts.conf` to `~/.tmux.conf`.
+
+Be aware that the Ghostty bindings replace Ghostty's tab shortcuts, its Cmd+0
+font-size reset, and the macOS Cmd+` window cycling. The tmux fragment uses
+`user-keys[180]` through `user-keys[194]` for the whole tmux server, so make
+sure nothing else claims them; only the managed session reacts to them.
+
+### Updating and removal
+
+The installer only manages files it created. A file that was already there is
+refused, even if it is byte-for-byte identical. The receipt at
+`~/.local/state/digits/dashboard.json` records each installed file's hash and
+mode and the directories the installer created. Running `--apply` again
+replaces only owned files that are still unmodified; a file you edited blocks
+both updates and removal until you deal with it.
+
+```bash
+python3 install.py --uninstall            # preview the removal
+python3 install.py --uninstall --apply    # remove owned, unmodified files
+```
+
+Removal keeps directories that existed beforehand or still contain something,
+and does not stop running tmux sessions. Chats that are already open must be
+reloaded while idle to pick up or drop the extension.
+
+To install by hand instead, copy `bin/ai-agents` to `~/.local/bin/`,
+`terminal/ai-agents.conf` to `~/.tmux/`, and `copilot/extensions/env-dashboard/`
+to `~/.copilot/extensions/`.
+
+[copilot/settings.json](copilot/settings.json) is a reviewed example of
+Copilot settings; the installer never applies it.
+
+## Make it yours
+
+- **Private bindings**: keep non-secret Markdown facts such as account names,
+  profiles, channels and repository lists in `~/.config/digits/context/` on
+  your machine. The bootstrap tells agents where to find them, and nothing ever
+  exports them. Templates live in
+  [examples/private-bindings/](examples/private-bindings/).
+- **Domain pages and routes**: add new topic pages under `context/`, and give
+  each one a row in the route table of
+  [context/bootstrap.md](context/bootstrap.md) that tells agents when to open
+  it.
+- **Routing fixtures**: before you change a page, record the correction that
+  keeps coming back as a small case in
+  [tests/fixtures/context-routing.json](tests/fixtures/context-routing.json).
+- **Private-terms guard**: list names that must never be published (people,
+  companies, internal hosts) in `~/.config/digits/private-terms.txt`, one per
+  line, or point `DIGITS_PRIVATE_TERMS` at another file. Findings from
+  `scripts/check_repository.py` look like `path:line: private term #N`, where
+  `N` is the line number in the terms file; the term itself is never printed.
+  Matching ignores case, and blank lines and `#` comment lines are skipped.
+  Without the default file the guard is skipped, but a `DIGITS_PRIVATE_TERMS`
+  value that names a missing file is an error.
+
+## Safety model
+
+- **Preview first**: neither installer writes anything without `--apply`. Both
+  keep ownership receipts, refuse files they did not create, and preserve your
+  edits.
+- **Staged approval**: skills treat planning, preview, publication, release and
+  outward communication as separate steps. Passing CI, a merge, or another
+  agent's suggestion never unlocks the next step.
+- **No credentials in Git**: examples contain placeholders only. Secrets belong
+  in the operating-system keychain or in environment variables; OAuth caches
+  and live MCP files stay on your machine.
+- **Guards**: the repository guard blocks private artifacts, machine-specific
+  home paths, invalid JSON and, when configured, private terms. The secret
+  guard runs detect-secrets without network access and reports where a finding
+  is, never what it is.
+- **Executable code**: extensions and hooks run as code with your permissions;
+  review them before installing.
+
+## Project layout
+
+```text
+bin/                 launcher (ai-agents) and Markdown viewer (md-view)
+terminal/            dashboard tmux configuration and optional tmux/Ghostty fragments
+copilot/             dashboard extension and a reviewed settings example
+plugin/              the digits Copilot CLI plugin: skills and lifecycle extensions
+context/             bootstrap, topic pages and version of the context library
+examples/            private-binding templates
+mcp/                 MCP integration recipes and a placeholder configuration
+scripts/             repository and secret guards
+tests/               Python tests for installers, guards, context and helpers
+docs/                build-your-own guide and release checklist
+spec/                functional specification used for the clean-room build
+install.py           dashboard installer
+context_install.py   context library installer
+CLEAN_ROOM.md        record of the clean-room process
+```
+
+The plugin ships thirteen skills: `assess-and-address`, `challenge-pass`,
+`done`, `draft-pr-sweep`, `inter-env`, `investigate`, `rebase-pr`,
+`request-review`, `review-reactions`, `self-improve`, `standup-update`,
+`summarize` and `update-shared-workflows`.
+
+## Verification
+
+Run these from the repository root with tmux and jq installed:
+
+```bash
+python -m unittest discover -s tests
+python -m unittest discover -s plugin/skills/inter-env -p 'test_*.py'
+for helper in plugin/skills/standup-update/*.sh; do bash -n "$helper"; done
+node --check copilot/extensions/env-dashboard/extension.mjs
+node --test copilot/extensions/env-dashboard/*.test.mjs
+for module in plugin/com.github.copilot/extensions/*/*.mjs; do node --check "$module"; done
+node --test plugin/com.github.copilot/extensions/*/*.test.mjs
+```
+
+The tests use throwaway home directories, private tmux sockets and mocked
+services. They send no chat messages and call no live service, so passing
+tests tell you nothing about MCP authentication. On a real installation, also
+check the window order, click targets, state changes and input prompts
+yourself.
+
+The guards need the pinned scanner, installed in an isolated environment:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements-dev.txt
+git add -A    # the index must hold exactly the commit you plan to make
+python scripts/check_repository.py
+python scripts/check_secrets.py
+```
+
+Neither guard runs unless the index matches the working tree. Untracked files
+that are not ignored are checked too. Review every finding properly; blanket
+exemptions are not the answer.
+
+## Contributing and security
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md) and the
+[Code of Conduct](CODE_OF_CONDUCT.md) before contributing.
+[PROVENANCE.md](PROVENANCE.md) explains where this package came from and what
+was deliberately left out, and [CLEAN_ROOM.md](CLEAN_ROOM.md) records the
+clean-room process used to build it.

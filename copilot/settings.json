@@ -1,0 +1,20 @@
+{
+  "beep": true,
+  "experimental": true,
+  "theme": "github",
+  "footer": {
+    "showModelEffort": true,
+    "showDirectory": true,
+    "showBranch": true,
+    "showContextWindow": true,
+    "showQuota": true,
+    "showAiUsed": true,
+    "showAgent": true,
+    "showCodeChanges": true,
+    "showSandbox": true,
+    "showYolo": true,
+    "showCiStatus": true,
+    "showCustom": true,
+    "showUsername": false
+  }
+}

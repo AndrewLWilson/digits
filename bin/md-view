@@ -1,0 +1,128 @@
+#!/usr/bin/env python3
+"""Show Markdown files rendered in a dedicated VS Code window.
+
+The files open in a separate VS Code instance with its own private profile,
+so your normal editor windows are never used. The first call starts that
+instance; later calls add tabs to it.
+"""
+
+import argparse
+import json
+import os
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+PROFILE_NAME = "digits-markdown-viewer"
+BUNDLE = Path("Visual Studio Code.app") / "Contents" / "Resources" / "app" / "bin" / "code"
+SYSTEM_APPLICATIONS = Path("/Applications")
+
+SETTINGS = {
+    "workbench.editorAssociations": {"*.md": "vscode.markdown.preview.editor"},
+    "chat.disableAIFeatures": True,
+    "extensions.ignoreRecommendations": True,
+    "update.mode": "none",
+    "security.workspace.trust.untrustedFiles": "open",
+    "window.restoreWindows": "none",
+    "window.title": "Markdown \u2014 ${activeEditorShort}",
+    "workbench.activityBar.location": "hidden",
+    "workbench.enableExperiments": False,
+    "workbench.layoutControl.enabled": False,
+    "workbench.startupEditor": "none",
+    "workbench.statusBar.visible": False,
+    "workbench.tips.enabled": False,
+}
+
+
+class ViewerError(Exception):
+    """A failure reported as one ``md-view: <detail>`` line."""
+
+
+def profile_dir():
+    return Path.home() / "Library" / "Application Support" / PROFILE_NAME
+
+
+def resolve_files(arguments):
+    resolved = [Path(os.path.expanduser(argument)).resolve() for argument in arguments]
+    bad = [str(path) for path in resolved if not path.is_file()]
+    if bad:
+        raise ViewerError("Not a file: {}".format(", ".join(bad)))
+    return resolved
+
+
+def find_code():
+    """Locate VS Code's command line tool, also outside the login PATH."""
+    found = shutil.which("code")
+    if found:
+        return found
+    for applications in (SYSTEM_APPLICATIONS, Path.home() / "Applications"):
+        candidate = applications / BUNDLE
+        if candidate.is_file() and os.access(str(candidate), os.X_OK):
+            return str(candidate)
+    raise ViewerError("VS Code's code command was not found on PATH or in Applications")
+
+
+def prepare_profile(profile):
+    (profile / "extensions").mkdir(parents=True, exist_ok=True)
+    (profile / "User").mkdir(parents=True, exist_ok=True)
+    settings = profile / "User" / "settings.json"
+    if settings.exists():
+        return
+    text = json.dumps(SETTINGS, indent=2, ensure_ascii=False) + "\n"
+    try:
+        with open(str(settings), "x", encoding="utf-8") as handle:
+            handle.write(text)
+    except FileExistsError:
+        pass
+
+
+def child_environment():
+    return {
+        name: value
+        for name, value in os.environ.items()
+        if not name.startswith("VSCODE_") and name != "ELECTRON_RUN_AS_NODE"
+    }
+
+
+def view(arguments):
+    files = resolve_files(arguments)
+    code = find_code()
+    profile = profile_dir()
+    prepare_profile(profile)
+    command = [
+        code,
+        "--user-data-dir", str(profile),
+        "--extensions-dir", str(profile / "extensions"),
+        "--reuse-window",
+        *[str(path) for path in files],
+    ]
+    result = subprocess.run(
+        command,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        env=child_environment(),
+    )
+    if result.returncode != 0:
+        detail = result.stderr.decode("utf-8", "replace").strip()
+        raise ViewerError(detail or "code exited with status {}".format(result.returncode))
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(
+        prog="md-view",
+        description="Show Markdown files rendered in a separate VS Code window.",
+    )
+    parser.add_argument("files", nargs="+", metavar="FILE", help="Markdown file to show")
+    args = parser.parse_args(argv)
+    try:
+        view(args.files)
+    except (ViewerError, OSError) as error:
+        print("md-view: {}".format(error), file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

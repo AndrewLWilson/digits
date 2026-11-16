@@ -1,0 +1,60 @@
+name: Source checks
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  source:
+    runs-on: macos-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Ensure tmux is installed
+        run: brew list tmux >/dev/null 2>&1 || brew install tmux
+
+      - name: Install development requirements
+        run: python -m pip install -r requirements-dev.txt
+
+      - name: Repository guard
+        run: python scripts/check_repository.py
+
+      - name: Secret guard
+        run: python scripts/check_secrets.py
+
+      - name: Python tests
+        run: python -m unittest discover -s tests
+
+      - name: inter-env helper tests
+        run: python -m unittest discover -s plugin/skills/inter-env -p 'test_*.py'
+
+      - name: Syntax-check standup-update shell helpers
+        run: for helper in plugin/skills/standup-update/*.sh; do bash -n "$helper" || exit 1; done
+
+      - name: Syntax-check the dashboard extension
+        run: node --check copilot/extensions/env-dashboard/extension.mjs
+
+      - name: Dashboard extension tests
+        run: node --test copilot/extensions/env-dashboard/*.test.mjs
+
+      - name: Syntax-check plugin extension entry points
+        run: for entry in plugin/com.github.copilot/extensions/*/extension.mjs; do node --check "$entry" || exit 1; done
+
+      - name: Plugin extension tests
+        run: node --test plugin/com.github.copilot/extensions/*/*.test.mjs

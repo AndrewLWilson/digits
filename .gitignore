@@ -1,0 +1,38 @@
+# OS and editor noise
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Node
+node_modules/
+
+# Environment files
+.env
+.env.*
+
+# Machine-local overrides
+*.local.json
+*.local.yml
+*.local.yaml
+
+# Key material
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Backups, logs and databases
+*.bak
+*.log
+*.db
+*.db-shm
+*.db-wal
+
+# Host runtime state
+session-state/
+mcp-oauth-config/
+resurrect/
+.local/

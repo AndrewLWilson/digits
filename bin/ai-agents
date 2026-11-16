@@ -1,0 +1,330 @@
+#!/usr/bin/env python3
+"""Start or reattach the ai-agents tmux workbench.
+
+One tmux session, ``ai-agents``, holds ten windows, one per independent
+environment directory under your home. The launcher creates missing windows,
+refuses to touch anything it does not recognise, applies the dashboard
+configuration and attaches. It also implements the dashboard shortcuts for
+jumping to the next chat needing attention and opening a chat's newest
+session Markdown.
+"""
+
+import argparse
+import fcntl
+import os
+import shutil
+import stat
+import subprocess
+import sys
+from pathlib import Path
+
+SESSION = "ai-agents"
+TARGET = "=ai-agents:"
+MARKER = "@ai-agents-managed"
+
+_DIRECTORIES = (
+    "left_pinky",
+    "left_ring",
+    "left_middle",
+    "left_pointer",
+    "left_thumb",
+    "right_thumb",
+    "right_pointer",
+    "right_middle",
+    "right_ring",
+    "right_pinky",
+)
+
+# (index, directory under HOME, window name)
+WINDOWS = tuple(
+    (index, directory, directory.replace("_", " ").title())
+    for index, directory in enumerate(_DIRECTORIES, start=1)
+)
+
+ATTENTION_TIERS = ("NEEDS YOU", "YOUR TURN")
+SESSION_OPTIONS = (
+    ("base-index", "1"),
+    ("destroy-unattached", "off"),
+    ("renumber-windows", "off"),
+    ("mouse", "on"),
+)
+
+# Replaceable hooks; every function reads them at call time.
+HOME = Path.home()
+CONFIG = HOME / ".tmux" / "ai-agents.conf"
+TMUX = shutil.which("tmux") or "tmux"
+FISH = shutil.which("fish")
+
+
+class LauncherError(Exception):
+    """A failure reported as one ``ai-agents: <detail>`` line."""
+
+
+def _run_tmux(args):
+    return subprocess.run(
+        [TMUX, *args],
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        text=True,
+    )
+
+
+def tmux(*args):
+    """Run one tmux command and return its stripped stdout; fail on error."""
+    result = _run_tmux(args)
+    if result.returncode != 0:
+        detail = result.stderr.strip() or "tmux {} failed with status {}".format(
+            args[0] if args else "", result.returncode
+        )
+        raise LauncherError(detail)
+    return result.stdout.strip()
+
+
+def list_sessions():
+    """Return the names of the server's sessions (empty when no server runs)."""
+    result = _run_tmux(("list-sessions", "-F", "#{session_name}"))
+    if result.returncode != 0:
+        if "no server running" in result.stderr or "No such file" in result.stderr:
+            return []
+        raise LauncherError(result.stderr.strip() or "tmux list-sessions failed")
+    return [line for line in result.stdout.splitlines() if line]
+
+
+def lock_path():
+    return Path(HOME) / "Library" / "Caches" / "env-sync" / "ai-agents.lock"
+
+
+def _shell_command():
+    return ["/usr/bin/env", "-u", "VIRTUAL_ENV", str(FISH), "-l"]
+
+
+def _require_managed():
+    if tmux("show-options", "-qv", "-t", TARGET, MARKER) != "1":
+        raise LauncherError(
+            "session {} is unmanaged (no {} 1); it will not be modified".format(
+                SESSION, MARKER
+            )
+        )
+
+
+def ensure_session():
+    """Create the session or its missing windows; never disturb existing ones."""
+    config = Path(CONFIG)
+    if not config.is_file():
+        raise LauncherError("Missing session configuration: {}".format(config))
+
+    new = SESSION not in list_sessions()
+    existing = {}
+    if not new:
+        _require_managed()
+        listing = tmux("list-windows", "-t", TARGET, "-F", "#{window_index}\t#{window_name}")
+        for line in listing.splitlines():
+            index, _, name = line.partition("\t")
+            existing[int(index)] = name
+
+    expected = {index: name for index, _directory, name in WINDOWS}
+    for index in sorted(existing):
+        if expected.get(index) != existing[index]:
+            raise LauncherError(
+                "Unexpected window {}{} named {!r}; refusing to replace it".format(
+                    TARGET, index, existing[index]
+                )
+            )
+
+    missing = [window for window in WINDOWS if window[0] not in existing]
+    for _index, directory, _name in missing:
+        path = Path(HOME) / directory
+        if path.is_symlink() or not path.is_dir():
+            raise LauncherError("Missing independent environment: {}".format(path))
+    if missing and not FISH:
+        raise LauncherError("fish is required to create environment shells; install fish first")
+
+    command = _shell_command()
+    remaining = missing
+    first_window = None
+    if new:
+        _index, directory, name = missing[0]
+        first_window = tmux(
+            "new-session", "-d", "-s", SESSION, "-n", name,
+            "-c", str(Path(HOME) / directory), "-P", "-F", "#{window_id}", *command
+        )
+        tmux("set-option", "-t", TARGET, MARKER, "1")
+        remaining = missing[1:]
+
+    for option, value in SESSION_OPTIONS:
+        tmux("set-option", "-t", TARGET, option, value)
+
+    if new and tmux("display-message", "-p", "-t", first_window, "#{window_index}") != "1":
+        tmux("move-window", "-s", first_window, "-t", "{}1".format(TARGET))
+
+    for index, directory, name in remaining:
+        tmux(
+            "new-window", "-d", "-t", "{}{}".format(TARGET, index), "-n", name,
+            "-c", str(Path(HOME) / directory), *command
+        )
+
+    for index, _directory, _name in WINDOWS:
+        window = "{}{}".format(TARGET, index)
+        tmux("set-option", "-w", "-t", window, "automatic-rename", "off")
+        tmux("set-option", "-w", "-t", window, "allow-rename", "off")
+
+    tmux("source-file", str(config))
+
+    if new:
+        tmux("select-window", "-t", "{}1".format(TARGET))
+
+
+def ensure_locked():
+    """Run ensure_session while holding the launcher lock."""
+    lock = lock_path()
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    with open(str(lock), "w") as handle:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        try:
+            ensure_session()
+        finally:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
+def attach():
+    if os.environ.get("TMUX"):
+        tmux("switch-client", "-t", TARGET)
+        return
+    os.execvp(TMUX, [TMUX, "attach-session", "-t", TARGET])
+
+
+def focus_next_attention():
+    """Select the next window whose chat needs attention, wrapping around."""
+    _require_managed()
+    listing = tmux(
+        "list-windows", "-t", TARGET, "-F",
+        "#{window_index}|#{window_active}|#{E:@hand-status-state}",
+    )
+    current = None
+    states = {}
+    for line in listing.splitlines():
+        index, active, state = line.split("|", 2)
+        states[int(index)] = state
+        if active == "1":
+            current = int(index)
+    for tier in ATTENTION_TIERS:
+        candidates = sorted(
+            index for index, state in states.items()
+            if state == tier and 1 <= index <= 10 and index != current
+        )
+        if candidates:
+            later = [index for index in candidates if current is not None and index > current]
+            chosen = later[0] if later else candidates[0]
+            tmux("select-window", "-t", "{}{}".format(TARGET, chosen))
+            return
+    tmux("display-message", "-t", TARGET, "No other chats need attention")
+
+
+def _is_regular(path):
+    try:
+        return stat.S_ISREG(os.lstat(str(path)).st_mode)
+    except OSError:
+        return False
+
+
+def _markdown_candidates(folder):
+    yield folder / "plan.md"
+    for subtree in ("files", "research", "checkpoints"):
+        base = folder / subtree
+        if base.is_symlink() or not base.is_dir():
+            continue
+        for directory, dirnames, filenames in os.walk(str(base)):
+            dirnames.sort()
+            for filename in sorted(filenames):
+                if filename.endswith(".md"):
+                    yield Path(directory) / filename
+
+
+def newest_markdown(folder):
+    """Return the newest candidate document in a session folder, or None."""
+    best = None
+    best_mtime = None
+    for candidate in _markdown_candidates(Path(folder)):
+        if not _is_regular(candidate):
+            continue
+        mtime = os.lstat(str(candidate)).st_mtime
+        if best is None or mtime > best_mtime:
+            best, best_mtime = candidate, mtime
+    return best
+
+
+def viewer_path():
+    return Path(os.path.realpath(__file__)).parent / "md-view"
+
+
+def show_markdown(pane, client=None):
+    """Open the newest Markdown of the chat in ``pane`` with md-view."""
+    _require_managed()
+    session, _, folder = tmux(
+        "display-message", "-p", "-t", pane, "#{session_name}\t#{@env-session-dir}"
+    ).partition("\t")
+    if session != SESSION:
+        raise LauncherError("pane {} is not in the ai-agents session".format(pane))
+
+    def message(text):
+        args = ["display-message", "-l"]
+        if client:
+            args += ["-c", client]
+        tmux(*args, text)
+
+    if not folder or not os.path.isabs(folder) or not os.path.isdir(folder):
+        message("No Copilot session folder for this chat")
+        return
+    document = newest_markdown(folder)
+    if document is None:
+        message("No Markdown in this chat's session folder yet")
+        return
+    try:
+        result = subprocess.run(
+            [str(viewer_path()), str(document)],
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+        )
+    except OSError as error:
+        message("md-view failed: {}".format(error))
+        return
+    if result.returncode != 0:
+        lines = result.stderr.strip().splitlines()
+        message(lines[-1] if lines else "md-view failed")
+
+
+def _parse(argv):
+    parser = argparse.ArgumentParser(
+        prog="ai-agents",
+        description="Start or reattach the ai-agents tmux workbench of ten environment windows.",
+    )
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument("--no-attach", action="store_true", help="prepare the session without attaching")
+    modes.add_argument("--next-attention", action="store_true", help="select the next chat needing attention")
+    modes.add_argument("--markdown", metavar="PANE", help="open the newest session Markdown of a tmux pane")
+    parser.add_argument("--client", help=argparse.SUPPRESS)
+    return parser.parse_args(argv)
+
+
+def main(argv=None):
+    args = _parse(argv)
+    try:
+        if args.next_attention:
+            focus_next_attention()
+        elif args.markdown is not None:
+            show_markdown(args.markdown, args.client)
+        else:
+            ensure_locked()
+            if args.no_attach:
+                print("Ready: {}".format(SESSION))
+            else:
+                attach()
+    except (LauncherError, OSError) as error:
+        print("ai-agents: {}".format(error), file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
