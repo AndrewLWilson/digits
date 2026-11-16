@@ -1272,7 +1272,7 @@ empty, print `No file changes needed.`
     jumps from window 1 visit 2, 3, 5, 7, 2.
 62. Given a Copilot-simulated pane titled `Ship it - GitHub Copilot` with a
     retired `@env-copilot-reason`, the title is `Ship it`; with reason
-    `Ken #[fg=red]` the title is `Waiting on: Ken # [fg=red] | Ship it`, also
+    `review #[fg=red]` the title is `Waiting on: review # [fg=red] | Ship it`, also
     when the state is `REVIEW`; after unsetting the reason it is `Ship it`.
 63. Given a plain-shell pane with a stale `YOUR TURN` option, then it renders
     `READY` and the attention jump leaves window 1 selected.

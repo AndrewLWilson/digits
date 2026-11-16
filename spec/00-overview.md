@@ -55,6 +55,11 @@ spec/                      # this specification (read-only for implementers)
   processes MUST wait for an observable condition (poll with a bounded timeout,
   for example up to 10 s at 50 ms intervals) instead of relying on fixed sleeps.
   A test that fails intermittently is a defect.
+  Assertions that compare two values derived from the wall clock MUST take
+  both from a single evaluation (or freeze the clock), never from separate
+  reads that can straddle a second boundary.
+- Fixtures and examples use neutral placeholder text, never real people's
+  names.
 - No hardcoded user home paths (`/Users/<name>/`, `/home/<name>/`) anywhere in
   the repository; derive paths from `HOME`/`Path.home()` or parameters.
 - Executables (`bin/*`, `plugin/**/*.sh`, Python helpers with a shebang) are
