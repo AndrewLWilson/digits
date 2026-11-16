@@ -19,13 +19,13 @@ Digits ships mechanisms, never the configuration of a particular organization.
 
 - Company names, accounts, channels, repository lists and profiles belong in
   private bindings (`~/.config/digits/context/`, with templates in
-  [examples/private-bindings/](examples/private-bindings/)), never in this
+  [examples/private-bindings/](../examples/private-bindings/)), never in this
   repository.
 - Examples use only `example-org`, `example.com` and `example.invalid`.
 - Never commit credentials, tokens, MCP files that contain secrets, chat
   transcripts or session state.
 - If your fork started out as a private harness, run the private-terms guard
-  locally before you push (see [Make it yours](README.md#make-it-yours)).
+  locally before you push (see [Make it yours](../README.md#make-it-yours)).
 
 ## Tests
 
@@ -35,7 +35,7 @@ only use temporary home directories, isolated tmux sockets and mocked
 services; they never reach live services or real user configuration.
 
 Before opening a pull request, run the checks listed under
-[Verification](README.md#verification), including both guards against your
+[Verification](../README.md#verification), including both guards against your
 staged changes.
 
 ## Commits

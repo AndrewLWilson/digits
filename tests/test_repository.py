@@ -579,10 +579,10 @@ class ProjectFileTests(unittest.TestCase):
 
 DOCUMENTS = [
     "README.md",
-    "CONTRIBUTING.md",
-    "SECURITY.md",
-    "CODE_OF_CONDUCT.md",
-    "PROVENANCE.md",
+    ".github/CONTRIBUTING.md",
+    ".github/SECURITY.md",
+    ".github/CODE_OF_CONDUCT.md",
+    "docs/provenance.md",
     "docs/build-your-own.md",
     "docs/open-source-release-checklist.md",
     "mcp/README.md",

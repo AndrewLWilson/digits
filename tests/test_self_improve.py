@@ -481,7 +481,7 @@ EXPECTED_SKILLS = {
 class PackageTests(unittest.TestCase):
     def test_plugin_manifest(self):
         manifest = json.loads((PLUGIN / "plugin.json").read_text(encoding="utf-8"))
-        self.assertEqual(list(manifest), ["$schema", "name", "version", "description"])
+        self.assertEqual(list(manifest), ["$schema", "name", "version", "description", "license"])
         self.assertEqual(manifest["$schema"], "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json")
         self.assertEqual(manifest["name"], "digits")
         self.assertEqual(manifest["version"], "1.0.0")

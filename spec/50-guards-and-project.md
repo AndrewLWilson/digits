@@ -22,6 +22,14 @@ fake secrets in tests.
 
 ---
 
+> **Layout amendment (supersedes paths below).** Only `README.md` and `LICENSE`
+> (standard MIT text) live at the repository root. `CONTRIBUTING.md`,
+> `SECURITY.md` and `CODE_OF_CONDUCT.md` live in `.github/`. Provenance lives in
+> `docs/provenance.md`, which also contains the clean-room rebuild record
+> (formerly `CLEAN_ROOM.md`) as a "How it was rebuilt" section. Wherever this
+> document names the old root paths, apply these locations and adjust relative
+> links accordingly. Release checklist blocker 1 (license) is done: MIT.
+
 ## 1. Shared concept: the index must equal the working tree
 
 Both guards inspect the files a contributor is about to commit. Because a

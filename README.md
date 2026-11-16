@@ -32,8 +32,7 @@ If you want to apply the same ideas to your own tools and team, read
 
 Digits has not been released yet.
 
-**No license has been chosen. Until one is added, nobody is granted any rights
-to use, copy, modify or distribute this code.**
+Digits is released under the [MIT License](LICENSE).
 
 The remaining release work is tracked in the
 [open-source release checklist](docs/open-source-release-checklist.md).
@@ -276,11 +275,10 @@ examples/            private-binding templates
 mcp/                 MCP integration recipes and a placeholder configuration
 scripts/             repository and secret guards
 tests/               Python tests for installers, guards, context and helpers
-docs/                build-your-own guide and release checklist
+docs/                build-your-own guide, provenance and release checklist
 spec/                functional specification used for the clean-room build
 install.py           dashboard installer
 context_install.py   context library installer
-CLEAN_ROOM.md        record of the clean-room process
 ```
 
 The plugin ships thirteen skills: `assess-and-address`, `challenge-pass`,
@@ -325,8 +323,8 @@ exemptions are not the answer.
 
 ## Contributing and security
 
-Read [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md) and the
-[Code of Conduct](CODE_OF_CONDUCT.md) before contributing.
-[PROVENANCE.md](PROVENANCE.md) explains where this package came from and what
-was deliberately left out, and [CLEAN_ROOM.md](CLEAN_ROOM.md) records the
-clean-room process used to build it.
+Read the [contributing guide](.github/CONTRIBUTING.md), the
+[security policy](.github/SECURITY.md) and the
+[code of conduct](.github/CODE_OF_CONDUCT.md) before contributing.
+[Provenance](docs/provenance.md) explains where Digits came from, how it was
+rebuilt from scratch, and what was deliberately left out.

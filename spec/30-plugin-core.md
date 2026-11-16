@@ -102,7 +102,7 @@ catalog `.github/plugin/marketplace.json` (its single `digits` entry has
 
 ### 1.3 `plugin.json` (MUST)
 
-A JSON object with exactly these four keys:
+A JSON object with exactly these five keys, in this order:
 
 | # | Key | Value |
 |---|---|---|
@@ -110,6 +110,7 @@ A JSON object with exactly these four keys:
 | 2 | `name` | `digits` |
 | 3 | `version` | `1.0.0` (must equal the marketplace entry's `version`) |
 | 4 | `description` | One sentence, freshly worded, naming these capability areas: guarded Copilot CLI workflows for evidence-backed standup drafts; review requests and review-status reactions; PR feedback handling; draft PR sweeps; rebases; shared workflow version updates; investigations; coordination across environments; proposal-first improvement of the shared context. |
+| 5 | `license` | `MIT` |
 
 Example description (acceptable wording): "Approval-gated Copilot CLI
 workflows: evidence-backed standup drafts, review requests and status reactions,
@@ -1831,7 +1832,7 @@ subprocesses or stubs, and no network, real tmux server or real home.
    whose `name` equals its directory and whose `description` is one non-empty
    line; exactly thirteen such directories exist.
 3. Given `plugin.json`, then it has exactly the keys `$schema`, `name`,
-   `version`, `description` with the values of section 1.3, and `version` equals
+   `version`, `description`, `license` with the values of section 1.3, and `version` equals
    the `digits` entry's version in `.github/plugin/marketplace.json`.
 4. Given the `done` skill, then its frontmatter has `user-invocable: true` and
    `disable-model-invocation: true`; no other skill has

@@ -8,9 +8,9 @@ below is closed, the repository stays internal or private.
 
 | # | Item | Owner | Status |
 |---|---|---|---|
-| 1 | Choose a license, add a `LICENSE` file, and update the README status and the package metadata | Maintainer with legal | Open (no license chosen yet) |
+| 1 | Choose a license, add a `LICENSE` file, and update the README status and the package metadata | Maintainer | Done: MIT (`LICENSE`) |
 | 2 | Obtain the employer's approval for an open-source release, covering IP assignment, the contribution policy, and a trademark and name check on "Digits" | Maintainer | Open |
-| 3 | Confirm consent and attribution for the workflow-skill ideas taken from another engineer's personal harness, and complete the placeholder in [PROVENANCE.md](../PROVENANCE.md) | Maintainer with the original author | Open |
+| 3 | Confirm consent and attribution for the workflow-skill ideas taken from another engineer's personal harness, and complete the placeholder in [provenance](provenance.md) | Maintainer with the original author | Open |
 | 4 | Publish into a new repository from fresh history: the clean-room history that starts at the specification commit, or a single new squashed commit. Never push the internal main history or other internal branches publicly | Maintainer | Open |
 | 5 | Run all guards with the maintainer's private-terms list and confirm they are clean on the exact commit to be published | Maintainer | Open |
 | 6 | Have someone independent review all executable code: both installers, the launcher, the shell helpers, the dashboard extension, and the plugin extensions `session-done` and `digits-refresh`, paying particular attention to the broad unattended approvals granted by the standup-update scheduled runner `run-scheduled.sh` | Reviewer | Open |
@@ -46,6 +46,6 @@ of the repository that will actually be published.
 - **Fresh-account walkthrough**: following only the README, install the
   dashboard, plugin and context into a brand-new user account, then uninstall
   them.
-- **Clean-room record**: `CLEAN_ROOM.md` is complete and the result of the
+- **Clean-room record**: the rebuild record in `docs/provenance.md` is complete and the result of the
   similarity scan is recorded.
 - **Optional**: add screenshots or a short recording of the dashboard.

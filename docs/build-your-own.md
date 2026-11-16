@@ -229,10 +229,7 @@ clean second preview.
 
 ```text
 README.md                quick start for each component, safety model
-CONTRIBUTING.md          how to propose changes and keep them generic
-SECURITY.md              private vulnerability reporting
-CODE_OF_CONDUCT.md       Contributor Covenant by reference
-PROVENANCE.md            origin and deliberately excluded material
+LICENSE                  MIT
 bin/                     launcher and Markdown viewer
 terminal/                dashboard tmux configuration and optional fragments
 copilot/                 dashboard extension and settings example
@@ -242,12 +239,11 @@ plugin/                  Agent Plugins 1.0 package: skills and extensions
 mcp/                     integration recipes and placeholder configuration
 scripts/                 repository and secret guards
 tests/                   Python tests and routing fixtures
-docs/                    this guide and the release checklist
+docs/                    this guide, provenance and the release checklist
 install.py               dashboard installer
 context_install.py       context installer
-.github/                 CI workflow and the digits marketplace manifest
+.github/                 CI, marketplace manifest, contributing, security, code of conduct
 spec/                    functional specification for the clean-room build
-CLEAN_ROOM.md            record of the clean-room process
 ```
 
 ### Kept, generalized, removed

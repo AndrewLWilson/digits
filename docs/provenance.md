@@ -9,15 +9,44 @@ setup went through several private iterations before it was generalized.
 **This repository is a clean-room implementation.** One team studied how the
 earlier private version behaved and wrote the specification in `spec/`. A
 second team, which never had access to that code, built everything else from
-the specification alone. [CLEAN_ROOM.md](CLEAN_ROOM.md) describes the whole
-process: the rules for specification authors, the contamination check, the
-isolated implementation and the final verification.
+the specification alone. [How it was rebuilt](#how-it-was-rebuilt) below
+describes the whole process.
 
 Digits is not an export of anything, nor a copy of anyone's home directory or
 dotfiles. It contains nothing specific to an organization: no company or
 personal names, internal hosts, repositories, channels or defaults. Only
 generic placeholders such as `example-org` and the private-bindings pattern
 remain.
+
+## How it was rebuilt
+
+1. **Specification (separate team).** Specification authors studied the
+   behavior of a prior, privately maintained implementation and wrote
+   functional requirements in `spec/`. These describe interfaces, observable
+   behavior, edge cases and acceptance tests. The rules for authors:
+   - No source code, configuration bodies or test code was transcribed.
+   - No sentence of prior documentation was reused.
+   - Interface facts needed for compatibility were allowed: file paths, command
+     flags, JSON keys, tmux option names, and host API event names.
+2. **Contamination check.** Before implementation started, the specification
+   was mechanically compared against the prior implementation for shared word
+   sequences. Matches were rewritten unless they were interface identifiers.
+3. **Implementation (clean team).** Fresh implementers were given only `spec/`.
+   They were instructed not to open, search or read the prior implementation,
+   its repositories, installed copies, or caches. All code, tests and
+   documentation outside `spec/` were written by them.
+4. **Verification.** The implementation was checked against the spec's
+   acceptance tests and the repository guards. A similarity scan against the
+   prior implementation looked for shared token sequences. Black-box
+   comparisons of command-line behavior were run outside the clean team; any
+   discrepancy was fed back only as a specification clarification, never as
+   code.
+
+The repository history begins with the specification commit, followed by the
+implementation commits.
+Later housekeeping (adding the MIT license, moving documents, fixing links and
+the matching test and spec updates) was done directly by the maintainer and
+introduced no material from the prior implementation.
 
 ## Design ideas carried forward
 
@@ -58,4 +87,4 @@ Users keep their own equivalents as private bindings in
 > another engineer's personal harness. Before publication the maintainers must
 > obtain that engineer's consent and preferred wording for the credit, or
 > remove the derived material. Completing or deleting this section is an item
-> on the [open-source release checklist](docs/open-source-release-checklist.md).
+> on the [open-source release checklist](open-source-release-checklist.md).

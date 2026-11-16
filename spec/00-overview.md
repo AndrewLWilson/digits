@@ -21,7 +21,7 @@ parallel on macOS. It has four independently adoptable components:
 ## Repository layout (MUST)
 
 ```text
-README.md  CONTRIBUTING.md  SECURITY.md  CODE_OF_CONDUCT.md  PROVENANCE.md  CLEAN_ROOM.md
+README.md  LICENSE            # only these two documents live at the root
 requirements-dev.txt  .gitignore
 install.py                 # workbench installer (10-workbench.md)
 context_install.py         # context installer (20-context.md)
@@ -35,9 +35,11 @@ plugin/                    # plugin package (30/40)
 mcp/                       # integration examples (50)
 scripts/                   # guards (50)
 tests/                     # Python tests for root modules, guards, context, helpers
-docs/                      # build-your-own guide, release checklist (50)
+docs/                      # build-your-own guide, provenance, release checklist (50)
 spec/                      # this specification (read-only for implementers)
 .github/workflows/checks.yml  .github/plugin/marketplace.json
+.github/CONTRIBUTING.md  .github/SECURITY.md  .github/CODE_OF_CONDUCT.md
+docs/provenance.md         # origin, clean-room rebuild record, exclusions
 ```
 
 ## Technology conventions (MUST)
@@ -65,6 +67,8 @@ spec/                      # this specification (read-only for implementers)
 - Executables (`bin/*`, `plugin/**/*.sh`, Python helpers with a shebang) are
   committed with the executable bit.
 - Versions: plugin and marketplace entry `1.0.0`; context library `1.0.0`.
+- License: MIT. `LICENSE` holds the standard MIT text; `plugin/plugin.json`
+  sets `"license": "MIT"`.
 - Names: product "Digits"; plugin name `digits`; marketplace name `digits`;
   command namespace `digits:`; tmux session `ai-agents`; private bindings
   directory `~/.config/digits/context`; state under `~/.local/state/digits/`.
