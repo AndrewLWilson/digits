@@ -51,6 +51,10 @@ spec/                      # this specification (read-only for implementers)
   configuration or real external service is touched by any test. Tests use
   temporary directories as `HOME`, isolated tmux sockets (`tmux -L <unique>`),
   and mocked subprocess/service calls.
+- Tests MUST be deterministic. Tests that drive tmux or other asynchronous
+  processes MUST wait for an observable condition (poll with a bounded timeout,
+  for example up to 10 s at 50 ms intervals) instead of relying on fixed sleeps.
+  A test that fails intermittently is a defect.
 - No hardcoded user home paths (`/Users/<name>/`, `/home/<name>/`) anywhere in
   the repository; derive paths from `HOME`/`Path.home()` or parameters.
 - Executables (`bin/*`, `plugin/**/*.sh`, Python helpers with a shebang) are

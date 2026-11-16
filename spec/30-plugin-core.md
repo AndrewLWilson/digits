@@ -1225,7 +1225,11 @@ whose `session_name` is `ai-agents`, adding key `environment` from
   `session_id` equals the requested one; exactly one is required, else `Refused`
   reporting the match count.
 - Without: if exactly one live pane, return it. Else if `matches` does not have
-  exactly one element, `Refused` (ambiguous; reports count). Else return the
+  exactly one element, `Refused` reporting the count. The message MUST distinguish
+  the two cases: with zero matches it says that no matching pane was found in the
+  environment (for example `left_thumb has 0 matching panes; expected one`) and
+  does not call the recipient ambiguous; with two or more it says the recipient is
+  ambiguous and suggests `--session-id`. Else return the
   single match (e.g. a parked shell, which later reads as not eligible).
 
 **`live_session(pane)`** → `{ "cli_pid": int, "session_id": str }`:

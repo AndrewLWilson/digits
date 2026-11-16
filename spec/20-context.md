@@ -482,7 +482,14 @@ To keep tests straightforward, `context_install` SHOULD expose: `SOURCE`, `ENTRY
 `read_receipt(home)`; `read_retained(home)`; `render(text, home, release,
 relative)`; `payload(home)` (mapping relative path -> bytes, including `ENTRY`);
 `make_plan(home, adopt_sha256=None, rollback=False)`; and `main(argv)` returning the
-exit status. `SOURCE` MUST be read at call time so tests can point it at a modified
+exit status.
+
+`context_install` MUST also expose `verify_owned(home, receipt)`: given a receipt
+as returned by `read_receipt`, it applies the ownership verification of §7.4 to
+the receipt's file records and directories and returns `None`, or raises
+`ValueError` (message containing `modified` for a missing or changed file). The
+self-improve helper (`30-plugin-core.md`) calls it by this name; a local
+re-implementation in the caller is not a substitute. `SOURCE` MUST be read at call time so tests can point it at a modified
 copy of the corpus.
 
 
