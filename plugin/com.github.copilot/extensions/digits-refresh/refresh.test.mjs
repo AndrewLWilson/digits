@@ -256,7 +256,7 @@ test("a remote session starts no timer and never reloads", async (t) => {
   const session = fakeSession({ isRemote: true });
   assert.equal(await ext.start(session), null);
   ext.onEvent({ type: "session.idle" });
-  await new Promise((r) => setTimeout(r, 10));
+  // Without a refresher onEvent schedules no work, so there is nothing to wait for.
   assert.deepEqual(timers, []);
   assert.deepEqual(session.calls, []);
 });
@@ -276,18 +276,22 @@ test("a local session watches files, starts a timer and reloads on idle", async 
     now: () => clock,
   });
   const session = fakeSession();
-  assert.ok(await ext.start(session));
+  const refresher = await ext.start(session);
+  assert.ok(refresher);
   assert.equal(timers.length, 1);
   assert.equal(timers[0].ms, 3000);
   writeFileSync(join(pluginRoot, "skills", "done", "SKILL.md"), "v2");
+  // onEvent starts a check synchronously; check() joins that in-flight run.
   ext.onEvent({ type: "session.idle" });
-  await new Promise((r) => setTimeout(r, 10));
+  await refresher.check();
   clock = 3000;
   ext.onEvent({ type: "session.idle", agentId: "child" });
-  await new Promise((r) => setTimeout(r, 10));
+  // The fakes resolve through microtasks only, so one macrotask turn drains any
+  // check this event could have started.
+  await new Promise((r) => setImmediate(r));
   assert.deepEqual(session.calls, ["getSources"]);
   timers[0].fn();
-  await new Promise((r) => setTimeout(r, 10));
+  await refresher.check();
   assert.deepEqual(session.calls, ["getSources", "skills.reload"]);
   assert.match(session.logs[0].message, /refreshing skills in place/);
   assert.equal(session.logs[0].level, "info");

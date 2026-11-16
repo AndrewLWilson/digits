@@ -153,6 +153,8 @@ def find_pane(environment, session_id=None):
         return selected[0]
     if len(live) == 1:
         return live[0]
+    if not matches:
+        raise Refused(f"{environment} has 0 matching panes; expected one")
     if len(matches) != 1:
         raise Refused(
             f"ambiguous recipient: {len(matches)} panes in {environment}; "

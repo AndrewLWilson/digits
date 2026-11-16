@@ -244,6 +244,15 @@ def _verify(home, files, directories):
             raise ValueError("Changed context directory: %s" % path)
 
 
+def verify_owned(home, receipt):
+    """Verify a receipt's owned files and directories (spec 20 section 7.4).
+
+    Returns None, or raises ValueError (containing ``modified`` for a missing or
+    changed file).
+    """
+    _verify(Path(home), receipt["files"], receipt["directories"])
+
+
 def read_retained(home):
     """Return the verified retained-versions mapping (empty when absent)."""
     home = Path(home)
@@ -364,7 +373,7 @@ def make_plan(home, adopt_sha256=None, rollback=False):
     previous = read_receipt(home)
     retained = read_retained(home)
     if previous is not None:
-        _verify(home, previous["files"], previous["directories"])
+        verify_owned(home, previous)
     if rollback:
         return _rollback_plan(home, previous, retained)
 

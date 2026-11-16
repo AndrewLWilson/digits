@@ -157,8 +157,22 @@ class DiscoveryTests(Base):
         lt = str(self.home / "left_thumb")
         panes = [pane("%1", lt, command="fish"), pane("%2", lt, command="zsh")]
         self.patch("discover", lambda: panes)
-        with self.assertRaises(inter_env.Refused):
+        with self.assertRaises(inter_env.Refused) as caught:
             inter_env.find_pane("left_thumb")
+        message = str(caught.exception)
+        self.assertIn("ambiguous", message)
+        self.assertIn("2", message)
+        self.assertIn("--session-id", message)
+
+    def test_38b_zero_matching_panes_is_not_ambiguous(self):
+        other = str(self.home / "right_thumb")
+        for panes in ([], [pane("%1", other)]):
+            self.patch("discover", lambda panes=panes: panes)
+            with self.assertRaises(inter_env.Refused) as caught:
+                inter_env.find_pane("left_thumb")
+            message = str(caught.exception)
+            self.assertIn("left_thumb has 0 matching panes", message)
+            self.assertNotIn("ambiguous", message)
 
     def test_39_input_states(self):
         live = pane()

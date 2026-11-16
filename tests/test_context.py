@@ -283,6 +283,37 @@ class InstallCycleTests(ContextTestCase):
         os.chmod(victim, 0o644)
         self.assertFails("modified", self.plan)
 
+    def test_verify_owned_accepts_intact_install(self):
+        self.apply()
+        self.assertIsNone(ci.verify_owned(self.home, ci.read_receipt(self.home)))
+        self.assertIsNone(ci.verify_owned(str(self.home), ci.read_receipt(self.home)))
+
+    def test_verify_owned_detects_edited_missing_and_mode_changes(self):
+        self.apply()
+        receipt = ci.read_receipt(self.home)
+        victim = self.home / self.release_files(receipt)[0]
+        original = victim.read_bytes()
+        victim.write_text("tampered\n")
+        os.chmod(victim, 0o600)
+        self.assertFails("modified", ci.verify_owned, self.home, receipt)
+        victim.write_bytes(original)
+        os.chmod(victim, 0o644)
+        self.assertFails("modified", ci.verify_owned, self.home, receipt)
+        victim.unlink()
+        self.assertFails("modified", ci.verify_owned, self.home, receipt)
+        self.entry().write_text("edited entry\n")
+        self.assertFails("modified", ci.verify_owned, self.home, receipt)
+
+    def test_verify_owned_detects_changed_directory(self):
+        self.apply()
+        receipt = ci.read_receipt(self.home)
+        receipt = dict(receipt, files={}, directories=list(receipt["directories"]))
+        target = self.home / receipt["directories"][-1]
+        shutil.rmtree(str(target))
+        target.write_text("not a directory\n")
+        with self.assertRaises(ValueError):
+            ci.verify_owned(self.home, receipt)
+
     def test_09_modified_backup_blocks_rollback(self):
         self.apply()
         backup = self.home / self.receipt()["backup"]["path"]

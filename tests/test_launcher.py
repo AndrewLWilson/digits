@@ -34,7 +34,13 @@ sys.path.insert(0, str(REPO))
 import install  # noqa: E402
 
 REAL_TMUX = shutil.which("tmux")
-TIMEOUT = 4.0
+TIMEOUT = 10.0
+POLL_INTERVAL = 0.05
+# tmux folds a press that arrives within about 300 ms of the previous one into
+# a double or triple click; successive clicks are spaced beyond that window.
+DOUBLE_CLICK_GUARD = 0.35
+# Alt+z, bound by ClientTests.sync() to record that tmux reached it.
+BARRIER_KEY = b"\x1bz"
 _COUNTER = itertools.count()
 NAMES = [
     "Left Pinky", "Left Ring", "Left Middle", "Left Pointer", "Left Thumb",
@@ -62,14 +68,15 @@ def ghostty_sequences():
 
 
 def poll(predicate, timeout=TIMEOUT):
-    deadline = time.time() + timeout
+    """Re-evaluate ``predicate`` until it is truthy or ``timeout`` expires."""
+    deadline = time.monotonic() + timeout
     while True:
         value = predicate()
         if value:
             return value
-        if time.time() > deadline:
+        if time.monotonic() > deadline:
             return value
-        time.sleep(0.05)
+        time.sleep(POLL_INTERVAL)
 
 
 class Client:
@@ -87,14 +94,18 @@ class Client:
         self.master = master
         self.buffer = bytearray()
         self.lock = threading.Lock()
+        self.position = 0
         self.closed = False
         self.reader = threading.Thread(target=self._drain, daemon=True)
         self.reader.start()
         self.case = case
+        self.clicked = False
         self.name = poll(self._find_name)
         if not self.name:
             raise AssertionError("tmux client did not attach")
-        time.sleep(0.3)
+        # The first full draw ends with the status line's hotkeys button.
+        if not self.wait_for("hotkeys"):
+            raise AssertionError("tmux client did not draw its status line")
         self.mark()
 
     def _find_name(self):
@@ -132,8 +143,23 @@ class Client:
         os.write(self.master, data)
 
     def click(self, column, row, button=0):
+        if self.clicked:
+            self._outlast_double_click()
         self.send("\x1b[<{};{};{}M".format(button, column, row).encode())
         self.send("\x1b[<{};{};{}m".format(button, column, row).encode())
+        self.clicked = True
+
+    def _outlast_double_click(self):
+        """Wait until tmux can no longer pair the next press with the last one.
+
+        Callers observe each click's effect before clicking again, so the
+        server has processed it. ``client_activity`` is the whole second of the
+        last input tmux processed; once the clock is more than one second plus
+        the guard past it, the previous click is older than the guard.
+        """
+        activity = int(self.case.tmux("display-message", "-p", "-c", self.name, "#{client_activity}"))
+        if not poll(lambda: time.time() >= activity + 1 + DOUBLE_CLICK_GUARD):
+            raise AssertionError("clock did not pass the tmux double-click window")
 
     def close(self):
         if self.process.poll() is None:
@@ -232,6 +258,13 @@ class TmuxTestCase(unittest.TestCase):
 
     def evaluate(self, index, text):
         return self.tmux("display-message", "-p", "-t", self.window(index), text)
+
+    def evaluate_together(self, index, *formats):
+        """Expand several formats in one tmux evaluation and split the results."""
+        separator = "<digits-field-separator>"
+        values = self.evaluate(index, separator.join(formats)).split(separator)
+        self.assertEqual(len(values), len(formats), values)
+        return values
 
     def state(self, index):
         return self.evaluate(index, "#{E:@hand-status-state}")
@@ -383,9 +416,9 @@ class DashboardTests(TmuxTestCase):
         self.pane_set(1, "@env-copilot-since", now - 83)
         for label, colour in (("WORKING", "colour75"), ("SUBAGENTS", "colour141"), ("WATCHING", "colour117")):
             self.pane_set(1, "@env-copilot-state", label)
-            timer = self.evaluate(1, "#{E:@hand-status-timer}")
+            # One evaluation, so the timer and the cell see the same second.
+            timer, cell = self.evaluate_together(1, "#{E:@hand-status-timer}", "#{E:@hand-status-cell}")
             self.assertRegex(timer, r"^1m2[3-9]s$")
-            cell = self.evaluate(1, "#{E:@hand-status-cell}")
             self.assertIn(timer, cell)
             self.assertIn("#[range=window|1]", cell)
             self.assertIn("#[fg={}]{}".format(colour, label), cell)
@@ -401,7 +434,7 @@ class DashboardTests(TmuxTestCase):
         self.pane_unset(1, "@env-copilot-took")
         self.assertEqual(self.evaluate(1, "#{E:@hand-status-timer}"), "@" + clock)
         self.pane_set(1, "@env-copilot-since", int(time.time()) - 83)
-        self.pane_set(1, "@env-waiting-reason", "Ken")
+        self.pane_set(1, "@env-waiting-reason", "review")
         self.assertRegex(self.evaluate(1, "#{E:@hand-status-timer}"), r"^1m2[3-9]s ago$")
         self.assertIn("#[fg=colour244]WAITING", self.evaluate(1, "#{E:@hand-status-cell}"))
         self.pane_unset(1, "@env-waiting-reason")
@@ -431,8 +464,8 @@ class DashboardTests(TmuxTestCase):
         self.pane_set(1, "@env-copilot-state", "YOUR TURN")
         self.pane_set(1, "@env-copilot-reason", "retired")
         self.assertEqual(self.evaluate(1, "#{E:@hand-status-title}"), "Ship it")
-        self.pane_set(1, "@env-waiting-reason", "Ken #[fg=red]")
-        expected = "Waiting on: Ken # [fg=red] | Ship it"
+        self.pane_set(1, "@env-waiting-reason", "review #[fg=red]")
+        expected = "Waiting on: review # [fg=red] | Ship it"
         self.assertEqual(self.evaluate(1, "#{E:@hand-status-title}"), expected)
         self.pane_set(1, "@env-copilot-state", "REVIEW")
         self.assertEqual(self.evaluate(1, "#{E:@hand-status-title}"), expected)
@@ -538,6 +571,32 @@ class ClientTests(TmuxTestCase):
     def press(self, client, key):
         client.send(self.keys[key])
 
+    def sync(self, client):
+        """Wait until tmux has finished everything the client's input so far triggered.
+
+        A client's keys run in order on its command queue, and a binding's
+        ``run-shell`` (without ``-b``) holds that queue until the command exits.
+        So once the barrier key's own binding has run, every earlier key, mouse
+        event, menu choice and prompt submission is complete. If a menu or prompt
+        is still open it swallows the barrier key and this fails.
+        """
+        token = "barrier-{}".format(next(_COUNTER))
+        self.tmux("bind-key", "-n", "M-z", "set-option", "-g", "@digits-test-barrier", token)
+        client.send(BARRIER_KEY)
+        reached = poll(lambda: self.tmux("show-options", "-gqv", "@digits-test-barrier") == token)
+        self.assertTrue(reached, "tmux did not reach the barrier key (is a menu or prompt still open?)")
+
+    def press_escape(self, client):
+        """Send a lone Escape and wait for tmux to act on it.
+
+        A lone ESC is held for ``escape-time`` and would merge with a following
+        escape sequence, so wait until the status line (covered by the open
+        prompt or menu) is redrawn before sending anything else.
+        """
+        client.mark()
+        client.send(b"\x1b")
+        self.assertTrue(client.wait_for("hotkeys"), "Escape did not close the prompt")
+
     def test_59_shortcuts(self):
         client = self.attach()
         digits = ["cmd+{}".format(n) for n in (1, 2, 3, 4, 5, 6, 7, 8, 9, 0)]
@@ -561,13 +620,13 @@ class ClientTests(TmuxTestCase):
         self.tmux("switch-client", "-c", client.name, "-t", "=unrelated:0")
         self.assertTrue(poll(lambda: self.tmux("display-message", "-p", "-c", client.name, "#{session_name}") == "unrelated"))
         self.press(client, "cmd+1")
-        time.sleep(0.5)
+        self.sync(client)
         self.assertEqual(self.active_window("unrelated"), 0)
 
         self.tmux("switch-client", "-c", client.name, "-t", "=ai-agents:")
         self.tmux("set-option", "-t", "=ai-agents:", "@ai-agents-managed", "0")
         self.press(client, "cmd+1")
-        time.sleep(0.5)
+        self.sync(client)
         self.assertEqual(self.active_window(), 10)
         with self.assertRaisesRegex(self.launcher.LauncherError, "unmanaged"):
             self.launcher.focus_next_attention()
@@ -587,7 +646,7 @@ class ClientTests(TmuxTestCase):
         self.tmux("select-window", "-t", self.window(1))
         client.send(self.keys["cmd+backquote"] * 2)
         self.assertTrue(self.wait_window(8))
-        time.sleep(0.5)
+        self.sync(client)
         self.assertEqual(self.active_window(), 8)
         for index in (3, 8):
             self.pane_set(index, "@env-copilot-state", "WORKING")
@@ -665,10 +724,10 @@ class ClientTests(TmuxTestCase):
         client.click(238, 1)
         self.assertTrue(client.wait_for("Digits shortcuts", "Cmd+Shift+M"))
         client.click(238, 1)
-        time.sleep(0.5)
+        self.sync(client)  # fails if the second click left the menu open
         client.send(b"\x1b[A")
         client.send(b"\r")
-        time.sleep(0.5)
+        self.sync(client)
         self.assertEqual(self.active_window(), 3)
         client.mark()
         client.click(238, 1)
@@ -676,7 +735,6 @@ class ClientTests(TmuxTestCase):
         client.send(b"\x1b[A")
         client.send(b"\r")
         self.assertTrue(self.wait_window(1))
-        time.sleep(0.5)
         client.click(10, 2)
         self.assertTrue(self.wait_window(2))
 
@@ -688,7 +746,7 @@ class ClientTests(TmuxTestCase):
             client.send(b"\x15")  # Ctrl+U clears the pre-filled text
         client.send(text.encode())
         client.send(b"\r")
-        time.sleep(0.3)
+        self.sync(client)
 
     def test_67_right_click_reason_is_literal(self):
         self.simulate_copilot()
@@ -729,8 +787,8 @@ class ClientTests(TmuxTestCase):
         client.click(5, 1, button=2)
         self.assertTrue(client.wait_for("Waiting on (empty clears)"))
         client.send(b"\x15changed")
-        client.send(b"\x1b")
-        time.sleep(0.5)
+        self.press_escape(client)
+        self.sync(client)
         self.assertEqual(self.pane_get(1, "@env-waiting-reason"), "external review")
 
         self.submit_reason(client, 5, 1, "", clear=True)

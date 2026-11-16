@@ -363,6 +363,41 @@ class RunTests(ContextBase):
         self.assertIsNone(state["last_success"])
         self.assertEqual(state["active"]["run_id"], self.run["run_id"])
 
+    def test_verify_context_delegates_to_installer_verify_owned(self):
+        self.assertFalse(hasattr(checkpoint, "_verify_owned_fallback"))
+        real_load = checkpoint._load_installer
+        calls = []
+
+        def load(harness):
+            module = real_load(harness)
+            self.assertTrue(callable(getattr(module, "verify_owned", None)))
+
+            def verify_owned(home, receipt):
+                calls.append((Path(home), receipt))
+                raise ValueError("sentinel: context file modified")
+
+            module.verify_owned = verify_owned
+            return module
+
+        with mock.patch.object(checkpoint, "_load_installer", side_effect=load):
+            with self.assertRaisesRegex(ValueError, "sentinel"):
+                checkpoint.verify_context(self.home, ROOT)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0][0], self.home)
+        self.assertEqual(calls[0][1], self.installer.read_receipt(self.home))
+
+    def test_verify_context_requires_installer_verify_owned(self):
+        real_load = checkpoint._load_installer
+
+        def load(harness):
+            module = real_load(harness)
+            del module.verify_owned
+            return module
+
+        with mock.patch.object(checkpoint, "_load_installer", side_effect=load):
+            with self.assertRaises(AttributeError):
+                checkpoint.verify_context(self.home, ROOT)
+
     def test_updated_success(self):
         target = self.home / ".config" / "digits" / "context" / "tool-and-repo-bindings.md"
         change = {"path": str(target), "summary": "Add the review channel binding",

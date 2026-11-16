@@ -231,26 +231,6 @@ def _load_installer(harness):
     return module
 
 
-def _verify_owned_fallback(installer, home, receipt):
-    """Ownership check from the installer contract, used if it has no helper."""
-    resolve = getattr(installer, "checked_path", None) or (lambda base, rel: safe_path(Path(base) / rel))
-    for relative, record in receipt.get("files", {}).items():
-        path = resolve(home, relative)
-        try:
-            info = os.lstat(path)
-        except FileNotFoundError:
-            raise ValueError(f"Installed context file is missing or modified: {path}") from None
-        if (
-            not stat.S_ISREG(info.st_mode)
-            or stat.S_IMODE(info.st_mode) != record.get("mode")
-            or sha256_bytes(Path(path).read_bytes()) != record.get("sha256")
-        ):
-            raise ValueError(f"Installed context file was modified: {path}")
-    for relative in receipt.get("directories", []):
-        if not Path(resolve(home, relative)).is_dir():
-            raise ValueError(f"Installed context directory changed: {relative}")
-
-
 def verify_context(home, harness_root):
     harness = safe_path(harness_root)
     if not (harness / "context_install.py").is_file() or not (harness / "context" / "bootstrap.md").is_file():
@@ -263,11 +243,7 @@ def verify_context(home, harness_root):
     receipt = installer.read_receipt(home)
     if receipt is None:
         raise ValueError("There is no owned installed context receipt; install the context first.")
-    verifier = getattr(installer, "verify_owned", None)
-    if verifier is not None:
-        verifier(home, receipt)
-    else:
-        _verify_owned_fallback(installer, home, receipt)
+    installer.verify_owned(home, receipt)
     if installer.make_plan(home)["writes"]:
         raise ValueError("Source and live context differ; preview and apply the context installer first.")
     return artifact(home / installer.ENTRY)
