@@ -30,12 +30,10 @@ If you want to apply the same ideas to your own tools and team, read
 
 ## Status
 
-Digits has not been released yet.
-
-Digits is released under the [MIT License](LICENSE).
-
-The remaining release work is tracked in the
-[open-source release checklist](docs/open-source-release-checklist.md).
+Digits is open source under the [MIT License](LICENSE). It is an early
+release: it is tested on macOS, and the dashboard and lifecycle extensions rely
+on experimental Copilot CLI extension APIs that may change between CLI
+versions. Issues and pull requests are welcome.
 
 ## Requirements
 
@@ -328,3 +326,9 @@ Read the [contributing guide](.github/CONTRIBUTING.md), the
 [code of conduct](.github/CODE_OF_CONDUCT.md) before contributing.
 [Provenance](docs/provenance.md) explains where Digits came from, how it was
 rebuilt from scratch, and what was deliberately left out.
+
+## Acknowledgements
+
+Several workflow skills were inspired by
+[Ken Crowell](https://github.com/oeuftete)'s personal agent harness. See
+[Provenance](docs/provenance.md#acknowledgements).

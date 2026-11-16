@@ -29,6 +29,8 @@ fake secrets in tests.
 > (formerly `CLEAN_ROOM.md`) as a "How it was rebuilt" section. Wherever this
 > document names the old root paths, apply these locations and adjust relative
 > links accordingly. Release checklist blocker 1 (license) is done: MIT.
+> The provenance acknowledgements credit Ken Crowell by name (replacing the
+> placeholder), and the README states the project is released under MIT.
 
 ## 1. Shared concept: the index must equal the working tree
 

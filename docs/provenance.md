@@ -79,12 +79,11 @@ None of the following exists in this repository, and none of it may be added:
 Users keep their own equivalents as private bindings in
 `~/.config/digits/context/`, and the installers never export them.
 
-## Acknowledgements — to be confirmed before publication
+## Acknowledgements
 
-> **Placeholder.** The ideas behind several workflow skills (investigation
-> framing, the per-claim challenge pass, assessing review feedback, triaging
-> draft PRs, rebasing PRs and updating shared workflows) came from patterns in
-> another engineer's personal harness. Before publication the maintainers must
-> obtain that engineer's consent and preferred wording for the credit, or
-> remove the derived material. Completing or deleting this section is an item
-> on the [open-source release checklist](open-source-release-checklist.md).
+Thanks to [Ken Crowell](https://github.com/oeuftete), whose personal agent
+harness inspired several of the workflow skills here: investigation framing,
+the per-claim challenge pass, assessing review feedback, sweeping draft PRs,
+rebasing PRs, updating shared workflows and keeping review reactions current.
+Digits reimplements those ideas from its own specification; any mistakes are
+its own.
